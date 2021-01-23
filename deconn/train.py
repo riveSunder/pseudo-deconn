@@ -17,11 +17,8 @@ import matplotlib.pyplot as plt
 def get_dataloader(root_path, batch_size=512, num_workers=2, image_size=64):
     dataset = dset.ImageFolder(root=root_path,\
             transform=transforms.Compose([\
-            transforms.RandomHorizontalFlip(),\
             transforms.Resize(image_size),\
-            transforms.CenterCrop(image_size),\
             transforms.ToTensor(),\
-            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),\
         ]))
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,\
@@ -42,7 +39,7 @@ if __name__ == "__main__":
             num_workers=num_workers, image_size=image_size)
 
 
-    num_epochs = 1000
+    num_epochs = 12000
     display_every = 10
     learning_rate = 1e-4
 
@@ -51,37 +48,42 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(deconn.parameters(), lr=learning_rate)
 
-    for epoch in range(num_epochs):
+
+    try:
+        for epoch in range(num_epochs):
 
 
-        for ii, data in enumerate(dataloader,0):
+            for ii, data in enumerate(dataloader,0):
 
 
-            deconn.zero_grad()
-            data_in = data[0][:,0:1,:,:].to(device)
+                deconn.zero_grad()
+                data_in = data[0][:,0:1,:,:].to(device)
 
-            recon, decon = deconn(data_in)
+                recon, decon = deconn(data_in)
 
-            loss = 0.8 * torch.mean(torch.abs(recon-data_in)**2) \
-                    + 0.2 * torch.mean(torch.abs(decon))
+                loss = 0.8 * torch.mean(torch.abs(recon-data_in)**2) \
+                        + 0.2 * torch.mean(torch.abs(decon))
 
-            loss.backward()
+                loss.backward()
 
-            optimizer.step()
+                optimizer.step()
 
-            if epoch % display_every == 0:
+                if epoch % display_every == 0:
 
-                if not(ii):
-                    running_loss = 0.0
+                    if not(ii):
+                        running_loss = 0.0
 
-                running_loss += loss
+                    running_loss += loss
 
-        if (epoch+1) % display_every == 0:
-            running_loss /= ii
-            print("batch loss at epoch {} =  {:.4e}".format(epoch-1, running_loss))
+            if (epoch-1) % display_every == 0:
+                running_loss /= ii
+                print("batch loss at epoch {} =  {:.4e}".format(epoch-1, running_loss))
 
 
+
+    except KeyboardInterrupt:
+
+        import pdb; pdb.set_trace()
 
     import pdb; pdb.set_trace()
-
 

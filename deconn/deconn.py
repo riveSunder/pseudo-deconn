@@ -2,11 +2,113 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import time
 
-
 class Deconn(nn.Module):
+
+    def __init__(self):
+        super(Deconn, self).__init__()
+
+        self.initialize_model()
+
+    def initialize_model(self):
+
+        self.ch = 4
+        self.conv0 = nn.Conv2d(1, self.ch, 3, padding=1,\
+                padding_mode="reflect") 
+        self.conv1 = nn.Conv2d(self.ch, self.ch*2, 3, padding=1,\
+                padding_mode="reflect") 
+        self.conv2 = nn.Conv2d(self.ch*2, self.ch*4, 3, padding=1,\
+                padding_mode="reflect") 
+        self.conv3 = nn.Conv2d(self.ch*4, self.ch*2, 3, padding=1,\
+                padding_mode="reflect") 
+        self.conv4 = nn.Conv2d(self.ch*2, self.ch*2, 3, padding=1,\
+                padding_mode="reflect") 
+
+        self.conv_t5 = nn.Conv2d(self.ch*2, self.ch*2, 3,\
+                stride=1, padding=1)
+        self.conv_t6 = nn.Conv2d(self.ch*4, self.ch*2, 3,\
+                stride=1, padding=1)
+        self.conv_t7 = nn.Conv2d(self.ch*6, self.ch*2, 3,\
+                stride=1, padding=1)
+        self.conv_t8 = nn.Conv2d(self.ch*4, self.ch*2, 3,\
+                stride=1, padding=1)
+        self.conv_t9 = nn.Conv2d(self.ch*3, self.ch*2, 3,\
+                stride=1, padding=1)
+
+        self.conv_t10 = nn.Conv2d(self.ch*2+1, 1, 3,\
+                stride=1, padding=1)
+
+        self.conv11 = nn.Conv2d(1, self.ch*2, 7, padding=3,\
+                padding_mode="reflect") 
+        self.conv12 = nn.Conv2d(self.ch*2, self.ch*2, 7, padding=3,\
+                padding_mode="reflect") 
+        self.conv13 = nn.Conv2d(self.ch*2, self.ch*2, 7, padding=3,\
+                padding_mode="reflect") 
+        self.conv_t14 = nn.Conv2d(self.ch*2, self.ch*2, 3, stride=1,\
+                padding=1) 
+
+        self.conv15 = nn.Conv2d(self.ch*4, 1, 3, padding=1, padding_mode="reflect") 
+
+    def forward(self, x):
+        """
+                                                                                    2h x 2w -> conv10
+        h x w -> conv0 ----------------------------------------------> cat h x w -> convT9 /      \ h x w -> conv11 --------------> cat  h x w -> conv14 -> y (h x w 
+            \ h/2 x w/2 -> conv1 -------------------------------> cat h/2 x w/2 -> convT8 /           \ h/2 x w/2 -> conv12 --> convT13 /
+                \ h/4 x w/4 -> conv2 ----------------------> cat h/4 x w/8 -> convT7 / 
+                    \ h/8 x w/8 -> conv3 -----------> cat h/8 x w/8 -> convT6 /
+                        \ h/16 x w/16 -> conv4  -> convT5 /
+        """
+        #downsampled=F.upsample(img, size=(img.size(2)//2, img.size(3)//2), mode=‘bilinear’)
+
+        dim_h, dim_w = x.shape[2], x.shape[3]
+
+        layer_0 = torch.max_pool2d(torch.arctan(self.conv0(x)), 2) #128
+        layer_1 = torch.max_pool2d(torch.arctan(self.conv1(layer_0)), 2) #64
+        layer_2 = torch.max_pool2d(torch.arctan(self.conv2(layer_1)), 2) #32
+        layer_3 = torch.max_pool2d(torch.arctan(self.conv3(layer_2)), 2) #16
+        layer_4a = torch.max_pool2d(torch.arctan(self.conv4(layer_3)), 2) #8
+
+        layer_4b = F.interpolate(layer_4a, size=(layer_4a.shape[2]*2, layer_4a.shape[3]*2))
+        layer_5 = torch.arctan(self.conv_t5(layer_4b))
+        
+        layer_6a = torch.cat([layer_3, layer_5], 1) 
+        layer_6a = F.interpolate(layer_6a, size=(layer_6a.shape[2]*2, layer_6a.shape[3]*2))
+        layer_6b = torch.arctan(self.conv_t6(layer_6a))
+        
+        layer_7a = torch.cat([layer_2, layer_6b], 1) 
+        layer_7a = F.interpolate(layer_7a, size=(layer_7a.shape[2]*2, layer_7a.shape[3]*2))
+        layer_7b = torch.arctan(self.conv_t7(layer_7a))
+
+        layer_8a = torch.cat([layer_1, layer_7b], 1) 
+        layer_8a = F.interpolate(layer_8a, size=(layer_8a.shape[2]*2, layer_8a.shape[3]*2))
+        layer_8b = torch.arctan(self.conv_t8(layer_8a))
+
+        layer_9a = torch.cat([layer_0, layer_8b], 1) 
+        layer_9a = F.interpolate(layer_9a, size=(layer_9a.shape[2]*2, layer_9a.shape[3]*2))
+        layer_9b = torch.arctan(self.conv_t9(layer_9a))
+
+        layer_10a = torch.cat([x, layer_9b], 1)
+        layer_10a = F.interpolate(layer_10a, size=(layer_10a.shape[2]*2, layer_10a.shape[3]*2))
+        layer_10b = torch.arctan(self.conv_t10(layer_10a))
+
+        layer_11 = torch.max_pool2d(torch.arctan(self.conv11(layer_10b)), 2)
+        layer_12 = torch.max_pool2d(torch.arctan(self.conv12(layer_11)), 2)
+        layer_13 = torch.arctan(self.conv13(layer_12))
+
+        layer_13 = F.interpolate(layer_13, size=(layer_13.shape[2]*2, layer_13.shape[3]*2))
+        layer_14a = torch.arctan(self.conv_t14(layer_13))
+
+        layer_14b = torch.cat([layer_11, layer_14a], 1)
+
+        layer_15 = torch.relu(self.conv15(layer_14b))
+
+        return layer_15, layer_10b
+
+
+class DeconnOld(nn.Module):
 
     def __init__(self):
         super(Deconn, self).__init__()
@@ -38,10 +140,10 @@ class Deconn(nn.Module):
         self.conv_t9 = nn.ConvTranspose2d(self.ch*3, self.ch*2, 2,\
                 stride=2, padding=0)
 
-        self.conv_t10 = nn.ConvTranspose2d(self.ch*2+1, self.ch*2, 2,\
+        self.conv_t10 = nn.ConvTranspose2d(self.ch*2+1, 1, 2,\
                 stride=2, padding=0)
 
-        self.conv11 = nn.Conv2d(self.ch*2, self.ch*2, 7, padding=3,\
+        self.conv11 = nn.Conv2d(1, self.ch*2, 7, padding=3,\
                 padding_mode="reflect") 
         self.conv12 = nn.Conv2d(self.ch*2, self.ch*2, 7, padding=3,\
                 padding_mode="reflect") 
@@ -61,7 +163,9 @@ class Deconn(nn.Module):
                     \ h/8 x w/8 -> conv3 -----------> cat h/8 x w/8 -> convT6 /
                         \ h/16 x w/16 -> conv4  -> convT5 /
         """
+        #downsampled=F.upsample(img, size=(img.size(2)//2, img.size(3)//2), mode=‘bilinear’)
 
+        dim_h, dim_w = x.shape[2], x.shape[3]
 
         layer_0 = torch.max_pool2d(torch.arctan(self.conv0(x)), 2) #128
         layer_1 = torch.max_pool2d(torch.arctan(self.conv1(layer_0)), 2) #64
