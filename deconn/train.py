@@ -29,9 +29,9 @@ def get_dataloader(root_path, batch_size=512, num_workers=2, image_size=64):
 if __name__ == "__main__":
 
     root_path = "./data/rpe-03_w3"
-    batch_size = 32
+    batch_size = 8
     num_workers = 16
-    image_size = 256
+    image_size = 512
 
     device = "cuda"
 
@@ -61,8 +61,8 @@ if __name__ == "__main__":
 
                 recon, decon = deconn(data_in)
 
-                loss = 0.8 * torch.mean(torch.abs(recon-data_in)**2) \
-                        + 0.2 * torch.mean(torch.abs(decon))
+                loss = 1.0 * torch.mean(torch.abs(recon-data_in)**2) \
+                        + 0.0 * torch.mean(torch.abs(decon))
 
                 loss.backward()
 
